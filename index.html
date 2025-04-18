@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Go / No-Go Geomagnetic Monitor</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #go-status {
+            font-size: 2em;
+            font-weight: bold;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        .green { background-color: #d4edda; color: #155724; }
+        .yellow { background-color: #fff3cd; color: #856404; }
+        .red { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>1Go / No-Go Geomagnetic Monitor</h1>
+    <div id="go-status">Loading...</div>
+    <div id="plot-df" style="width:100%;height:400px;"></div>
+    <div id="plot-kp" style="width:100%;height:400px;"></div>
+
+    <script>
+        const VARIATION_LIMIT = 2.0;
+        const KP_THRESHOLD = 4;
+
+        async function fetchJSON(url) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Failed to fetch " + url);
+            return await res.json();
+        }
+
+        async function fetchText(url) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Failed to fetch " + url);
+            return await res.text();
+        }
+
+        function diffArray(arr) {
+            let diffs = [null];
+            for (let i = 1; i < arr.length; i++) {
+                diffs.push(arr[i] - arr[i - 1]);
+            }
+            return diffs;
+        }
+
+        function getNowISOString(offsetHours = 0) {
+            const now = new Date();
+            now.setHours(now.getHours() + offsetHours);
+            return now.toISOString();
+        }
+
+        async function main() {
+
+        const rain_inches = 0.0;
+        const snow_inches = 0.0;
+        const rain_ok = (rain_inches < 1.0) && (snow_inches < 1.0);
+
+        const rainSnowInfo = document.createElement('p');
+        rainSnowInfo.innerText = `🌧️ Past 24h in Mitchell, SD: Rain = ${rain_inches}″, Snow = ${snow_inches}″`;
+        document.body.insertBefore(rainSnowInfo, document.getElementById("plot-df"));
+
+            const end = new Date().toISOString();
+            const start = new Date(Date.now() - 60 * 60 * 1000).toISOString();  // 1 hour ago
+            const usgs_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
+
+            const usgs = await fetchJSON(usgs_url);
+            const times = usgs.times.map(t => new Date(t));
+            const values = usgs.values[0].values.map(parseFloat);
+            const diffs = diffArray(values);
+            const exceeds = diffs.map(d => Math.abs(d) > VARIATION_LIMIT);
+            const variation_ok = !exceeds.includes(true);
+
+            const trace_df = {
+                x: times,
+                y: diffs,
+                mode: 'lines+markers',
+                name: '∆F',
+                line: { color: 'blue' }
+            };
+
+            const layout_df = {
+                title: '∆F Variation (Last Hour)',
+                yaxis: { title: '∆F (nT)' },
+                shapes: [
+                    { type: 'line', x0: times[0], x1: times[times.length-1], y0: VARIATION_LIMIT, y1: VARIATION_LIMIT, line: { dash: 'dash' } },
+                    { type: 'line', x0: times[0], x1: times[times.length-1], y0: -VARIATION_LIMIT, y1: -VARIATION_LIMIT, line: { dash: 'dash' } }
+                ]
+            };
+
+            Plotly.newPlot('plot-df', [trace_df], layout_df);
+
+            // --- Kp Data ---
+            const kp_txt = await fetchText("https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt");
+            const today = new Date();
+            const today_str = today.toISOString().split("T")[0].replace(/-/g, " ");
+            const kp_line = kp_txt.split("\n").find(line => line.startsWith(today_str));
+
+            let kp_vals = [], kp_labels = [];
+            if (kp_line) {
+                const parts = kp_line.trim().split(/\s+/);
+                const midnight = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+                for (let i = 0; i < 8; i++) {
+                    const val = parseFloat(parts[parts.length - 8 + i]);
+                    if (!isNaN(val) && val !== -1.00) {
+                        kp_vals.push(val);
+                        const t = new Date(midnight.getTime() + i * 3 * 3600 * 1000);
+                        kp_labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    }
+                }
+            }
+
+            const recent_kps = kp_vals.slice(-3);
+            const recent_labels = kp_labels.slice(-3);
+            const kp_ok = recent_kps.length > 0 && recent_kps[recent_kps.length - 1] <= KP_THRESHOLD;
+
+            const colors = recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson');
+
+            const trace_kp = {
+                x: recent_labels,
+                y: recent_kps,
+                type: 'bar',
+                marker: { color: colors }
+            };
+
+            const layout_kp = {
+                title: 'Kp Index (Last 9 Hours)',
+                yaxis: { title: 'Kp Index', range: [0, 9] },
+                shapes: [
+                    { type: 'line', x0: -0.5, x1: 2.5, y0: KP_THRESHOLD, y1: KP_THRESHOLD, line: { dash: 'dash', color: 'gray' } }
+                ]
+            };
+
+            Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
+
+            // --- GO / NO-GO ---
+            const go = variation_ok && kp_ok && rain_ok;
+            const status = document.getElementById("go-status");
+            status.innerText = go ? "✅ GO" : "❌ NO-GO";
+            status.className = go ? "green" : kp_ok ? "yellow" : "red";
+        }
+
+        main();
+    </script>
+</body>
+</html>
