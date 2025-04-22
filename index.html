@@ -223,16 +223,16 @@
 
             let statusText = "", className = "";
             if (all_but_15s_ok && !fine_variation_ok) {
-                statusText = "⚠️ WARNING (15s ∆F too high)";
+                statusText = "⚠️ WARNING (15s ∆F)";
                 className = "yellow";
             } else if (all_but_15s_ok && fine_variation_ok) {
                 statusText = "✅ GO";
                 className = "green";
             } else {
                 statusText = "❌ NO-GO";
-                if (!variation_ok) statusText += " (1m ∆F too high)";
-                if (!kp_ok) statusText += " (Kp too high)";
-                if (!rain_ok) statusText += " (Too much rain/snow)";
+                if (!variation_ok) statusText += " (1m ∆F)";
+                if (!kp_ok) statusText += " (Kp)";
+                if (!rain_ok) statusText += " (Rain/snow)";
                 className = "red";
             }
 
