@@ -33,6 +33,7 @@
     </ul>
     <div id="go-status">Loading...</div>
     <div id="plot-df" style="width:100%;height:400px;"></div>
+    <div id="plot-f" style="width:100%;height:400px;"></div>
     <div id="plot-kp" style="width:100%;height:400px;"></div>
 
     <script>
@@ -85,7 +86,7 @@
                 console.error("Failed to fetch precipitation data:", err);
             }
 
-            const rain_inches = rainSum * 39.3701; // m to inches
+            const rain_inches = rainSum * 39.3701;
             const snow_inches = snowDepth * 39.3701;
             return { rain_inches, snow_inches };
         }
@@ -99,7 +100,7 @@
             document.body.insertBefore(rainSnowInfo, document.getElementById("plot-df"));
 
             const end = new Date().toISOString();
-            const start = new Date(Date.now() - 60 * 60 * 1000).toISOString();  // 1 hour ago
+            const start = new Date(Date.now() - 60 * 60 * 1000).toISOString();
             const usgs_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
 
             const usgs = await fetchJSON(usgs_url);
@@ -109,6 +110,7 @@
             const exceeds = diffs.map(d => Math.abs(d) > VARIATION_LIMIT);
             const variation_ok = !exceeds.includes(true);
 
+            // ∆F Plot
             const trace_df = {
                 x: times,
                 y: diffs,
@@ -128,7 +130,23 @@
 
             Plotly.newPlot('plot-df', [trace_df], layout_df);
 
-            // --- 15s resolution variation check (last 15 minutes) ---
+            // Raw F Plot
+            const trace_f = {
+                x: times,
+                y: values,
+                mode: 'lines',
+                name: 'F (nT)',
+                line: { color: 'darkgreen' }
+            };
+
+            const layout_f = {
+                title: 'F (Total Intensity) at BOU (Last Hour)',
+                yaxis: { title: 'F (nT)' }
+            };
+
+            Plotly.newPlot('plot-f', [trace_f], layout_f);
+
+            // 15s Resolution Check
             const fine_start = new Date(Date.now() - 15 * 60 * 1000).toISOString();
             const fine_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=15&starttime=${fine_start}&endtime=${end}&format=json`;
 
@@ -143,7 +161,7 @@
                 fine_variation_ok = false;
             }
 
-            // --- Kp Data ---
+            // Kp Plot
             const kp_txt = await fetchText("https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt");
             const today = new Date();
             const today_str = today.toISOString().split("T")[0].replace(/-/g, " ");
@@ -164,16 +182,15 @@
             }
 
             const recent_kps = kp_vals.slice(-3);
-            const recent_labels = kp_labels.slice(-3);
             const kp_ok = recent_kps.length > 0 && recent_kps[recent_kps.length - 1] <= KP_THRESHOLD;
 
-            const colors = recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson');
-
             const trace_kp = {
-                x: recent_labels,
+                x: kp_labels.slice(-3),
                 y: recent_kps,
                 type: 'bar',
-                marker: { color: colors }
+                marker: {
+                    color: recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson')
+                }
             };
 
             const layout_kp = {
@@ -186,13 +203,11 @@
 
             Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
 
-            // --- GO / NO-GO / WARNING Status ---
+            // Decision Logic
             const status = document.getElementById("go-status");
-
             const all_but_15s_ok = variation_ok && kp_ok && rain_ok;
-            let statusText = "";
-            let className = "";
 
+            let statusText = "", className = "";
             if (all_but_15s_ok && !fine_variation_ok) {
                 statusText = "⚠️ WARNING (15s ∆F too high)";
                 className = "yellow";
