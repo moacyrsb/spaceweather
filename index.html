@@ -186,18 +186,29 @@
 
             Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
 
-            // --- GO / NO-GO Status ---
-            const go = variation_ok && fine_variation_ok && kp_ok && rain_ok;
+            // --- GO / NO-GO / WARNING Status ---
             const status = document.getElementById("go-status");
 
-            let statusText = go ? "✅ GO" : "❌ NO-GO";
-            if (!fine_variation_ok && variation_ok) statusText += " (15s ∆F too high)";
-            if (!variation_ok) statusText += " (1m ∆F too high)";
-            if (!kp_ok) statusText += " (Kp too high)";
-            if (!rain_ok) statusText += " (Too much rain/snow)";
+            const all_but_15s_ok = variation_ok && kp_ok && rain_ok;
+            let statusText = "";
+            let className = "";
+
+            if (all_but_15s_ok && !fine_variation_ok) {
+                statusText = "⚠️ WARNING (15s ∆F too high)";
+                className = "yellow";
+            } else if (all_but_15s_ok && fine_variation_ok) {
+                statusText = "✅ GO";
+                className = "green";
+            } else {
+                statusText = "❌ NO-GO";
+                if (!variation_ok) statusText += " (1m ∆F too high)";
+                if (!kp_ok) statusText += " (Kp too high)";
+                if (!rain_ok) statusText += " (Too much rain/snow)";
+                className = "red";
+            }
 
             status.innerText = statusText;
-            status.className = go ? "green" : kp_ok ? "yellow" : "red";
+            status.className = className;
         }
 
         main();
