@@ -1,117 +1,128 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Go / No-Go Geomagnetic Monitor</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        #go-status {
-            font-size: 2em;
-            font-weight: bold;
-            padding: 10px;
-            margin-top: 20px;
-            border-radius: 10px;
-            display: inline-block;
-        }
-        .green { background-color: #d4edda; color: #155724; }
-        .yellow { background-color: #fff3cd; color: #856404; }
-        .red { background-color: #f8d7da; color: #721c24; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Geomagnetic Monitor - Go / No-Go</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #go-status {
+      font-size: 2em;
+      font-weight: bold;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+    .green { background-color: #d4edda; color: #155724; }
+    .yellow { background-color: #fff3cd; color: #856404; }
+    .red { background-color: #f8d7da; color: #721c24; }
+    #conditions {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #f9f9f9;
+      line-height: 1.6;
+    }
+  </style>
 </head>
 <body>
-    <h1>Go / No-Go Geomagnetic Monitor</h1>
-    <p><strong>Conditions for GO:</strong></p>
-    <ul>
-        <li>Less than 1" of rain or snow in the past 24h</li>
-        <li>Kp index ≤ 4 in the past 3h</li>
-        <li>F variation ≤ 2nT over the past 1-minute intervals</li>
-        <li>F variation ≤ 0.5nT over the past 15-second intervals (last 15 minutes)</li>
-    </ul>
-    <div id="go-status">Loading...</div>
-    <div id="plot-df" style="width:100%;height:400px;"></div>
-    <div id="plot-f" style="width:100%;height:400px;"></div>
-    <div id="plot-kp" style="width:100%;height:400px;"></div>
+  <h1>Geomagnetic Monitor</h1>
+  <div id="conditions">
+    <strong>Current Conditions:</strong><br>
+    <div id="cond-precip"></div>
+    <div id="cond-kp"></div>
+    <div id="cond-df1m"></div>
+    <div id="cond-df15s"></div>
+  </div>
+  <div id="go-status">Loading...</div>
+  <div id="plot-df" style="width:100%;height:400px;"></div>
+  <div id="plot-f" style="width:100%;height:400px;"></div>
+  <div id="plot-kp" style="width:100%;height:400px;"></div>
 
-    <script>
-        const VARIATION_LIMIT = 2.0;
-        const FINE_VARIATION_LIMIT = 0.5;
-        const KP_THRESHOLD = 4;
+  <script>
+    const VARIATION_LIMIT = 2.0;
+    const FINE_VARIATION_LIMIT = 1.0;
+    const KP_THRESHOLD = 4;
 
-        async function fetchJSON(url) {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Failed to fetch " + url);
-            return await res.json();
+    async function fetchJSON(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch " + url);
+      return await res.json();
+    }
+
+    async function fetchText(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch " + url);
+      return await res.text();
+    }
+
+    function diffArray(arr) {
+      let diffs = [null];
+      for (let i = 1; i < arr.length; i++) {
+        diffs.push(arr[i] - arr[i - 1]);
+      }
+      return diffs;
+    }
+
+    async function getRainFromHTML() {
+      const url = "https://forecast.weather.gov/data/obhistory/KMHE.html";
+      let total = 0.0;
+      try {
+        const res = await fetch(url);
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const rows = doc.querySelectorAll("table tr");
+        for (let row of rows) {
+          const cells = row.querySelectorAll("td");
+          if (cells.length > 0) {
+            const val = parseFloat(cells[cells.length - 1].innerText.trim());
+            if (!isNaN(val)) total += val;
+          }
         }
+      } catch (err) {
+        console.warn("Rain fetch failed", err);
+      }
+      return total;
+    }
 
-        async function fetchText(url) {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Failed to fetch " + url);
-            return await res.text();
-        }
+    async function main() {
+      const now = new Date();
+      const end = now.toISOString();
+      const start = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
-        function diffArray(arr) {
-            let diffs = [null];
-            for (let i = 1; i < arr.length; i++) {
-                diffs.push(arr[i] - arr[i - 1]);
-            }
-            return diffs;
-        }
+      // Precipitation
+      const precip = await getRainFromHTML();
+      let precipStatus = "✅ Go";
+      if (precip < 0.1 && precip > 0.0) precipStatus = "⚠️ Warning - light rain";
+      else if (precip >= 0.1) precipStatus = "⚠️ Warning - heavy rainfall";
 
-        async function getRainSnowFromNWS() {
-            const stationId = "KMHE"; // Mitchell, SD
-            const end = new Date();
-            const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-            const url = `https://api.weather.gov/stations/${stationId}/observations?start=${start.toISOString()}&end=${end.toISOString()}`;
+      document.getElementById("cond-precip").innerText = `- Accumulated rain/snowfall: ${precip.toFixed(2)}″ – ${precipStatus}`;
 
-            let rainSum = 0.0;
-            let snowDepth = 0.0;
+      // ∆F 1-minute variation
+      const df_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
+      const df_data = await fetchJSON(df_url);
+      const df_times = df_data.times.map(t => new Date(t));
+      const df_vals = df_data.values[0].values.map(parseFloat);
+      const df_diffs = diffArray(df_vals);
+      const df_ok = !df_diffs.some(d => Math.abs(d) > VARIATION_LIMIT);
+      document.getElementById("cond-df1m").innerText = `- Delta F ≤ 2nT over 1 minute – ${df_ok ? "✅ Go" : "❌ No-go"}`;
 
-            try {
-                const data = await fetchJSON(url);
-                for (const obs of data.features) {
-                    const rain = obs.properties.precipitationLastHour?.value;
-                    if (rain != null) {
-                        rainSum += rain;  // in meters
-                    }
-                    const snow = obs.properties.snowDepth?.value;
-                    if (snow != null) {
-                        snowDepth = Math.max(snowDepth, snow);  // in meters
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to fetch precipitation data:", err);
-            }
+      // --- 1-minute F data for variation check ---
+      const usgs_url_60s = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
+      const usgs = await fetchJSON(usgs_url_60s);
+      const times = usgs.times.map(t => new Date(t));
+      const values = usgs.values[0].values.map(parseFloat);
+      const diffs = diffArray(values);
+      const exceeds = diffs.map(d => Math.abs(d) > VARIATION_LIMIT);
+      const variation_ok = !exceeds.includes(true);
 
-            const rain_inches = rainSum * 39.3701;
-            const snow_inches = snowDepth * 39.3701;
-            return { rain_inches, snow_inches };
-        }
-
-        async function main() {
-            const end = new Date().toISOString();
-            const start = new Date(Date.now() - 60 * 60 * 1000).toISOString();  // 1 hour ago
-
-            const { rain_inches, snow_inches } = await getRainSnowFromNWS();
-            const rain_ok = (rain_inches < 1.0) && (snow_inches < 1.0);
-
-            const rainSnowInfo = document.createElement('p');
-            rainSnowInfo.innerText = `🌧️ Past 24h in Mitchell, SD: Rain = ${rain_inches.toFixed(2)}″, Snow = ${snow_inches.toFixed(2)}″`;
-            document.body.insertBefore(rainSnowInfo, document.getElementById("plot-df"));
-
-            // --- 1-minute F data for variation check ---
-            const usgs_url_60s = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
-            const usgs = await fetchJSON(usgs_url_60s);
-            const times = usgs.times.map(t => new Date(t));
-            const values = usgs.values[0].values.map(parseFloat);
-            const diffs = diffArray(values);
-            const exceeds = diffs.map(d => Math.abs(d) > VARIATION_LIMIT);
-            const variation_ok = !exceeds.includes(true);
-
-            const trace_df = {
+      const trace_df = {
                 x: times,
                 y: diffs,
                 mode: 'lines+markers',
@@ -119,7 +130,7 @@
                 line: { color: 'blue' }
             };
 
-            const layout_df = {
+      const layout_df = {
                 title: '∆F Variation (Last Hour)',
                 yaxis: { title: '∆F (nT)' },
                 shapes: [
@@ -130,117 +141,106 @@
 
             Plotly.newPlot('plot-df', [trace_df], layout_df);
 
-            // --- 1-second F data for actual field plot ---
-            const usgs_url_1s = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=1&starttime=${start}&endtime=${end}&format=json`;
+      // ∆F 15s variation
+      const df15_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=15&starttime=${new Date(now.getTime() - 15 * 60 * 1000).toISOString()}&endtime=${end}&format=json`;
+      let df15_ok = true;
+      try {
+        const df15 = await fetchJSON(df15_url);
+        const df15_vals = df15.values[0].values.map(parseFloat);
+        const df15_diffs = diffArray(df15_vals);
+        df15_ok = !df15_diffs.some(d => Math.abs(d) > FINE_VARIATION_LIMIT);
+      } catch {
+        df15_ok = true;
+      }
 
-            try {
-                const usgs_1s = await fetchJSON(usgs_url_1s);
-                const times_1s = usgs_1s.times.map(t => new Date(t));
-                const values_1s = usgs_1s.values[0].values.map(parseFloat);
+      document.getElementById("cond-df15s").innerText = `- Delta F ≤ 1nT over 15s – ${df15_ok ? "✅ Go" : "⚠️ Warning"}`;
 
-                const trace_f = {
-                    x: times_1s,
-                    y: values_1s,
-                    mode: 'lines',
-                    name: 'F (1s)',
-                    line: { color: 'darkgreen' }
-                };
+      // Raw F 1s plot
+      const f_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=1&starttime=${start}&endtime=${end}&format=json`;
+      try {
+        const f_data = await fetchJSON(f_url);
+        const f_times = f_data.times.map(t => new Date(t));
+        const f_vals = f_data.values[0].values.map(parseFloat);
+        Plotly.newPlot("plot-f", [{
+          x: f_times,
+          y: f_vals,
+          mode: 'lines',
+          name: 'F (1s)',
+          line: { color: 'green' }
+        }], {
+          title: 'F (1s total field)',
+          yaxis: { title: 'F (nT)' }
+        });
+      } catch {
+        console.warn("1s F plot failed");
+      }
 
-                const layout_f = {
-                    title: 'F (Total Intensity at BOU, 1s resolution)',
-                    yaxis: { title: 'F (nT)' }
-                };
-
-                Plotly.newPlot('plot-f', [trace_f], layout_f);
-            } catch (err) {
-                console.warn("Could not load 1s F data:", err);
-                const fWarning = document.createElement('p');
-                fWarning.innerText = "⚠️ Could not fetch 1-second F data for BOU.";
-                fWarning.style.color = 'orange';
-                document.body.insertBefore(fWarning, document.getElementById("plot-f"));
-            }
-
-            // --- 15s resolution variation check (last 15 minutes) ---
-            const fine_start = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-            const fine_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=15&starttime=${fine_start}&endtime=${end}&format=json`;
-
-            let fine_variation_ok = true;
-            try {
-                const fine_data = await fetchJSON(fine_url);
-                const fine_values = fine_data.values[0].values.map(parseFloat);
-                const fine_diffs = diffArray(fine_values);
-                fine_variation_ok = !fine_diffs.some(d => Math.abs(d) > FINE_VARIATION_LIMIT);
-            } catch (err) {
-                console.error("15s data fetch failed", err);
-                fine_variation_ok = false;
-            }
-
-            // --- Kp Data ---
-            const kp_txt = await fetchText("https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt");
-            const today = new Date();
-            const today_str = today.toISOString().split("T")[0].replace(/-/g, " ");
-            const kp_line = kp_txt.split("\n").find(line => line.startsWith(today_str));
-
-            let kp_vals = [], kp_labels = [];
-            if (kp_line) {
-                const parts = kp_line.trim().split(/\s+/);
-                const midnight = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-                for (let i = 0; i < 8; i++) {
-                    const val = parseFloat(parts[parts.length - 8 + i]);
-                    if (!isNaN(val) && val !== -1.00) {
-                        kp_vals.push(val);
-                        const t = new Date(midnight.getTime() + i * 3 * 3600 * 1000);
-                        kp_labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                    }
-                }
-            }
-
-            const recent_kps = kp_vals.slice(-3);
-            const kp_ok = recent_kps.length > 0 && recent_kps[recent_kps.length - 1] <= KP_THRESHOLD;
-
-            const trace_kp = {
-                x: kp_labels.slice(-3),
-                y: recent_kps,
-                type: 'bar',
-                marker: {
-                    color: recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson')
-                }
-            };
-
-            const layout_kp = {
-                title: 'Kp Index (Last 9 Hours)',
-                yaxis: { title: 'Kp Index', range: [0, 9] },
-                shapes: [
-                    { type: 'line', x0: -0.5, x1: 2.5, y0: KP_THRESHOLD, y1: KP_THRESHOLD, line: { dash: 'dash', color: 'gray' } }
-                ]
-            };
-
-            Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
-
-            // --- GO / WARNING / NO-GO Logic ---
-            const status = document.getElementById("go-status");
-            const all_but_15s_ok = variation_ok && kp_ok && rain_ok;
-
-            let statusText = "", className = "";
-            if (all_but_15s_ok && !fine_variation_ok) {
-                statusText = "⚠️ WARNING (15s ∆F)";
-                className = "yellow";
-            } else if (all_but_15s_ok && fine_variation_ok) {
-                statusText = "✅ GO";
-                className = "green";
-            } else {
-                statusText = "❌ NO-GO";
-                if (!variation_ok) statusText += " (1m ∆F)";
-                if (!kp_ok) statusText += " (Kp)";
-                if (!rain_ok) statusText += " (Rain/snow)";
-                className = "red";
-            }
-
-            status.innerText = statusText;
-            status.className = className;
+      // Kp index using the correct recent 9-hour format
+      const kp_txt = await fetchText("https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt");
+      const today = new Date();
+      const today_str = today.toISOString().split("T")[0].replace(/-/g, " ");
+      const kp_line = kp_txt.split("\n").find(line => line.startsWith(today_str));
+      let kp_vals = [], kp_labels = [];
+      if (kp_line) {
+        const parts = kp_line.trim().split(/\s+/);
+        const midnight = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+        for (let i = 0; i < 8; i++) {
+          const val = parseFloat(parts[parts.length - 8 + i]);
+          if (!isNaN(val) && val !== -1.00) {
+            kp_vals.push(val);
+            kp_labels.push(new Date(midnight.getTime() + i * 3 * 3600 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          }
         }
+      }
 
-        main();
-    </script>
+      const recent_kps = kp_vals.slice(-3);
+      const latestKp = recent_kps[recent_kps.length - 1] ?? 9;
+      const kp_ok = latestKp <= KP_THRESHOLD;
+
+      document.getElementById("cond-kp").innerText = `- Kp index ≤ 4 – ${kp_ok ? "✅ Go" : "⚠️ Warning"}`;
+
+      const trace_kp = {
+        x: kp_labels.slice(-3),
+        y: recent_kps,
+        type: 'bar',
+        marker: {
+          color: recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson')
+        }
+      };
+
+      const layout_kp = {
+        title: 'Kp Index (Last 9 Hours)',
+        yaxis: { title: 'Kp Index', range: [0, 9] },
+        shapes: [{
+          type: 'line',
+          x0: -0.5,
+          x1: 2.5,
+          y0: KP_THRESHOLD,
+          y1: KP_THRESHOLD,
+          line: { dash: 'dash', color: 'gray' }
+        }]
+      };
+
+      Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
+
+      // --- Final status logic ---
+      const status = document.getElementById("go-status");
+      if (latestKp > KP_THRESHOLD && (!df_ok || !df15_ok)) {
+        status.innerText = "❌ NO-GO";
+        status.className = "red";
+      } else if (latestKp > KP_THRESHOLD || !df15_ok || (precip > 0 && precip < 0.1)) {
+        status.innerText = "⚠️ WARNING";
+        status.className = "yellow";
+      } else if (precip >= 0.1 || !df_ok) {
+        status.innerText = "❌ NO-GO";
+        status.className = "red";
+      } else {
+        status.innerText = "✅ GO";
+        status.className = "green";
+      }
+    }
+
+    main();
+  </script>
 </body>
 </html>
