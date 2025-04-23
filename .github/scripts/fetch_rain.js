@@ -4,26 +4,39 @@ const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: "new" });
   const page = await browser.newPage();
+
   await page.goto('https://dex.cocorahs.org/stations/SD-DV-38/obs-tables', {
-    waitUntil: 'networkidle2'
+    waitUntil: 'networkidle2',
+    timeout: 60000
   });
 
-  // Evaluate the table rows and grab the first Gauge Catch value
-  const rain = await page.evaluate(() => {
+  // Wait for the main table to appear
+  await page.waitForSelector('table tbody tr');
+
+  // Screenshot for debugging
+  await page.screenshot({ path: 'debug_screenshot.png', fullPage: true });
+
+  // Log contents of first row
+  const debugText = await page.evaluate(() => {
     const rows = document.querySelectorAll('table tbody tr');
-    if (!rows.length) return 0.0;
+    if (!rows.length) return "No rows found";
+    const cells = Array.from(rows[0].querySelectorAll('td')).map(td => td.textContent.trim());
+    return cells.join(" | ");
+  });
 
-    // The 4th cell (index 3) is usually "Gauge Catch (in)"
-    const todayRow = rows[0];
-    const cells = todayRow.querySelectorAll('td');
-    if (cells.length < 4) return 0.0;
+  fs.writeFileSync('debug_row.txt', debugText);
 
-    const val = cells[3].textContent.trim();
+  // Extract gauge value
+  const rain = await page.evaluate(() => {
+    const row = document.querySelector('table tbody tr');
+    if (!row) return 0.0;
+    const cell = row.querySelectorAll('td')[3]; // Gauge Catch column
+    if (!cell) return 0.0;
+    const val = cell.textContent.trim();
     const match = val.match(/[\d.]+/);
     return match ? parseFloat(match[0]) : 0.0;
   });
-
-  // Save the rainfall data to JSON
+  
   fs.writeFileSync('rain_today.json', JSON.stringify({
     date: new Date().toISOString().split('T')[0],
     total_precip_in: rain
