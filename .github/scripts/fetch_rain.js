@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: "new" });
   const page = await browser.newPage();
-  await page.goto('https://dex.cocorahs.org/stations/SD-DV-38/obs-tables', { waitUntil: 'networkidle2' });
+  await page.goto('https://dex.cocorahs.org/stations/SD-DV-38/', { waitUntil: 'networkidle2' });
 
   const text = await page.evaluate(() => {
     const match = Array.from(document.querySelectorAll('*'))
