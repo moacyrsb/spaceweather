@@ -31,3 +31,4 @@ jobs:
           git add rain_today.json
           git commit -m "Update rain data"
           git push
+
