@@ -91,7 +91,7 @@
 
       // Precipitation
       const precip = await getRainFromHTML();
-      let precipStatus = "✅ Go";
+      let precipStatus = "✅ Good";
       if (precip < 0.1 && precip > 0.0) precipStatus = "⚠️ Warning - light rain";
       else if (precip >= 0.1) precipStatus = "⚠️ Warning - heavy rainfall";
 
@@ -104,7 +104,7 @@
       const df_vals = df_data.values[0].values.map(parseFloat);
       const df_diffs = diffArray(df_vals);
       const df_ok = !df_diffs.some(d => Math.abs(d) > VARIATION_LIMIT);
-      document.getElementById("cond-df1m").innerText = `- Delta F ≤ 2nT over 1 minute – ${df_ok ? "✅ Go" : "❌ No-go"}`;
+      document.getElementById("cond-df1m").innerText = `- Delta F ≤ 2nT over 1 minute – ${df_ok ? "✅ Good" : "⚠️ Warning"}`;
 
       // --- 1-minute F data for variation check ---
       const usgs_url_60s = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
@@ -146,7 +146,7 @@
         df15_ok = true;
       }
 
-      document.getElementById("cond-df15s").innerText = `- Delta F ≤ 1nT over 15s – ${df15_ok ? "✅ Go" : "⚠️ Warning"}`;
+      document.getElementById("cond-df15s").innerText = `- Delta F ≤ 1nT over 15s – ${df15_ok ? "✅ Good" : "⚠️ Warning"}`;
 
       // Raw F 1s plot
       const f_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=1&starttime=${start}&endtime=${end}&format=json`;
@@ -190,7 +190,7 @@
       const latestKp = recent_kps[recent_kps.length - 1] ?? 9;
       const kp_ok = latestKp <= KP_THRESHOLD;
 
-      document.getElementById("cond-kp").innerText = `- Kp index ≤ 4 – ${kp_ok ? "✅ Go" : "⚠️ Warning"}`;
+      document.getElementById("cond-kp").innerText = `- Kp index ≤ 4 – ${kp_ok ? "✅ Good" : "⚠️ Warning"}`;
 
       const trace_kp = {
         x: kp_labels.slice(-3),
@@ -219,16 +219,16 @@
       // --- Final status logic ---
       const status = document.getElementById("go-status");
       if (latestKp > KP_THRESHOLD && (!df_ok || !df15_ok)) {
-        status.innerText = "❌ NO-GO";
-        status.className = "red";
+        status.innerText = "⚠️ WARNING - Check with QA/QC";
+        status.className = "yellow";
       } else if (latestKp > KP_THRESHOLD || !df15_ok || (precip > 0 && precip < 0.1)) {
-        status.innerText = "⚠️ WARNING";
+        status.innerText = "⚠️ WARNING - Check with QA/QC";
         status.className = "yellow";
       } else if (precip >= 0.1 || !df_ok) {
-        status.innerText = "❌ NO-GO";
-        status.className = "red";
+        status.innerText = "⚠️ WARNING - Check with QA/QC";
+        status.className = "yellow";
       } else {
-        status.innerText = "✅ GO";
+        status.innerText = "✅ Good to fly";
         status.className = "green";
       }
     }
