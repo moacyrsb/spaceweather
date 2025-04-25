@@ -217,30 +217,30 @@
       Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
 
 // --- Final status logic ---
-const status = document.getElementById("go-status");
+    const status = document.getElementById("go-status");
 
 // Check individual conditions
-const kp_ok = latestKp <= KP_THRESHOLD;
-const df1m_ok = df_ok;
-const df15s_ok = df15_ok;
-const precip_ok = precip < 0.1;
+
+    const df1m_ok = df_ok;
+    const df15s_ok = df15_ok;
+    const precip_ok = precip < 0.1;
 
 // Count how many conditions are OK
-const conditions_ok = [kp_ok, df1m_ok, df15s_ok, precip_ok].filter(Boolean).length;
+    const conditions_ok = [kp_ok, df1m_ok, df15s_ok, precip_ok].filter(Boolean).length;
 
-if (conditions_ok === 4) {
-  status.innerText = "✅ Good to fly";
-  status.className = "green";
-} else if (conditions_ok === 0) {
-  status.innerText = "❌ Not good to fly";
-  status.className = "red";
-} else {
-  status.innerText = "⚠️ WARNING - Check conditions";
-  status.className = "yellow";
-}
+    if (conditions_ok === 4) {
+      status.innerText = "✅ Good to fly";
+      status.className = "green";
+    } else if (conditions_ok === 0) {
+      status.innerText = "❌ Not good to fly";
+      status.className = "red";
+    } else {
+      status.innerText = "⚠️ WARNING - Check conditions";
+      status.className = "yellow";
+    }
 
 
     main();
-  </script>
-</body>
-</html>
+    </script>
+  </body>
+  </html>
