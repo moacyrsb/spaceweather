@@ -216,22 +216,16 @@
 
       Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
 
-      // --- Final status logic ---
-      const status = document.getElementById("go-status");
-      if (latestKp > KP_THRESHOLD && (!df_ok || !df15_ok)) {
-        status.innerText = "⚠️ WARNING - Check with QA/QC";
-        status.className = "yellow";
-      } else if (latestKp > KP_THRESHOLD || !df15_ok || (precip > 0 && precip < 0.1)) {
-        status.innerText = "⚠️ WARNING - Check with QA/QC";
-        status.className = "yellow";
-      } else if (precip >= 0.1 || !df_ok) {
-        status.innerText = "⚠️ WARNING - Check with QA/QC";
-        status.className = "yellow";
-      } else {
-        status.innerText = "✅ Good to fly";
-        status.className = "green";
-      }
-    }
+// --- Final status logic ---
+    const status = document.getElementById("go-status");
+
+  if (latestKp > KP_THRESHOLD && !df_ok && !df15_ok && precip >= 0.1) {
+    status.innerText = "❌ Not good to fly";
+    status.className = "red";
+  } else {
+    status.innerText = "✅ Good to fly";
+    status.className = "green";
+  }
 
     main();
   </script>
