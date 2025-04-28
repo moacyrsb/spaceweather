@@ -69,41 +69,40 @@
       return diffs;
     }
 
-// New rain fetch function to include timestamp
-  async function getRainFromHTML() {
-  const url = "rain_today.json";
-  let result = { total: 0.0, timestamp: null };
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data && data.total_precip_in != null) {
-        result.total = parseFloat(data.total_precip_in);
+    async function getRainFromHTML() {
+      const url = "rain_today.json";
+      let result = { total: 0.0, timestamp: new Date() };
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.total_precip_in != null) {
+          result.total = parseFloat(data.total_precip_in);
+        }
+        if (data && data.observation_time_rfc822) {
+          result.timestamp = new Date(data.observation_time_rfc822);
+        }
+      } catch (err) {
+        console.warn("Rain fetch failed", err);
       }
-      if (data && data.observation_time_rfc822) {
-        result.timestamp = new Date(data.observation_time_rfc822);
-      } else {
-        result.timestamp = new Date(); // fallback to now
-      }
-    } catch (err) {
-      console.warn("Rain fetch failed", err);
+      return result;
     }
-    return result;
-  }
+
 
     async function main() {
       const now = new Date();
       const end = now.toISOString();
       const start = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
-      // Precipitation
-      const rainData = await getRainFromHTML();
-      const precip = rainData.total;
-      const rainTime = rainData.timestamp.toLocaleString();
-      let precipStatus = "✅ Good";
+// Precipitation with timestamp
+    const rainData = await getRainFromHTML();
+    const precip = rainData.total;
+    const rainTime = rainData.timestamp.toLocaleString(); // format timestamp
+
+    let precipStatus = "✅ Good";
       if (precip < 0.1 && precip > 0.0) precipStatus = "⚠️ Warning - light rain";
       else if (precip >= 0.1) precipStatus = "⚠️ Warning - heavy rainfall";
 
-      document.getElementById("cond-precip").innerText = `- Accumulated rain/snowfall: ${precip.toFixed(2)}″ – ${precipStatus}`;
+    document.getElementById("cond-precip").innerText = `- Accumulated rain/snowfall: ${precip.toFixed(2)}″ (measured at ${rainTime}) – ${precipStatus}`;
 
       // ∆F 1-minute variation
       const df_url = `https://geomag.usgs.gov/ws/data/?id=BOU&elements=F&sampling_period=60&starttime=${start}&endtime=${end}&format=json`;
