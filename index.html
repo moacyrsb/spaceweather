@@ -69,20 +69,26 @@
       return diffs;
     }
 
-    async function getRainFromHTML() {
-      const url = "rain_today.json";
-      let total = 0.0;
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data && data.total_precip_in != null) {
-          total = parseFloat(data.total_precip_in);
-        }
-      } catch (err) {
-        console.warn("Rain fetch failed", err);
+// New rain fetch function to include timestamp
+  async function getRainFromHTML() {
+  const url = "rain_today.json";
+  let result = { total: 0.0, timestamp: null };
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.total_precip_in != null) {
+        result.total = parseFloat(data.total_precip_in);
       }
-      return total;
+      if (data && data.observation_time_rfc822) {
+        result.timestamp = new Date(data.observation_time_rfc822);
+      } else {
+        result.timestamp = new Date(); // fallback to now
+      }
+    } catch (err) {
+      console.warn("Rain fetch failed", err);
     }
+    return result;
+  }
 
     async function main() {
       const now = new Date();
@@ -90,7 +96,9 @@
       const start = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
       // Precipitation
-      const precip = await getRainFromHTML();
+      const rainData = await getRainFromHTML();
+      const precip = rainData.total;
+      const rainTime = rainData.timestamp.toLocaleString();
       let precipStatus = "✅ Good";
       if (precip < 0.1 && precip > 0.0) precipStatus = "⚠️ Warning - light rain";
       else if (precip >= 0.1) precipStatus = "⚠️ Warning - heavy rainfall";
@@ -235,8 +243,8 @@
       status.innerText = "❌ Not good to fly";
       status.className = "red";
     } else {
-      status.innerText = "⚠️ WARNING - Check conditions";
-      status.className = "yellow";
+      status.innerText = " ";
+      status.className = " ";
     }
 
   }
