@@ -34,16 +34,17 @@ const puppeteer = require('puppeteer');
   });
 
   // Try to parse the date from MM/DD/YYYY format
-  let isoDate = null;
-  if (rainInfo.date) {
-    const parts = rainInfo.date.match(/(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);
-    if (parts) {
-      const month = parts[1].padStart(2, '0');
-      const day = parts[2].padStart(2, '0');
-      const year = parts[3];
-      isoDate = `${year}-${month}-${day}`;
+    let isoDate = null;
+    if (rainInfo.date) {
+      const parts = rainInfo.date.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (parts) {
+        const month = parts[1].padStart(2, '0');
+        const day = parts[2].padStart(2, '0');
+        const year = parts[3];
+        isoDate = `${year}-${month}-${day}`;
+      }
     }
-  }
+
 
   // Write the final rain_today.json
   fs.writeFileSync('rain_today.json', JSON.stringify({
