@@ -35,6 +35,13 @@ const puppeteer = require('puppeteer');
 
   // Debug: show raw date string
   console.log("Raw date string from site:", rainInfo.date);
+  // DEBUG: Save first row's HTML to inspect
+  const rowHTML = await page.evaluate(() => {
+  const row = document.querySelector('table tbody tr');
+  return row ? row.innerHTML : "No row found";
+  });
+  fs.writeFileSync('debug_row.txt', rowHTML);
+
 
   // Try flexible parsing of date
   let isoDate = null;
