@@ -79,7 +79,7 @@
         result.total = parseFloat(data.total_precip_in);
       }
       if (data && data.date) {
-        result.timestamp = new Date(data.date); // ✅ Use this instead of observation_time_rfc822
+        result.timestamp = data.date;  // just keep the original string
       }
     } catch (err) {
       console.warn("Rain fetch failed", err);
@@ -97,7 +97,7 @@
 // Precipitation with timestamp
     const rainData = await getRainFromHTML();
     const precip = rainData.total;
-    const rainTime = rainData.timestamp.toLocaleString(); // format timestamp
+    const rainTime = rainData.timestamp;  // just print it
 
     let precipStatus = "✅ Good";
       if (precip < 0.1 && precip > 0.0) precipStatus = "Light rain";
