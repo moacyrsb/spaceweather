@@ -6,6 +6,7 @@ const puppeteer = require('puppeteer');
     headless: "new",
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
+
   const page = await browser.newPage();
 
   await page.goto('https://dex.cocorahs.org/stations/SD-DV-38/obs-tables', {
@@ -16,16 +17,15 @@ const puppeteer = require('puppeteer');
   // Wait for the main table to appear
   await page.waitForSelector('table tbody tr');
 
-  // Extract gauge value AND measurement date
+  // Extract both rain amount and date from the first table row
   const rainInfo = await page.evaluate(() => {
     const row = document.querySelector('table tbody tr');
     if (!row) return { rain: 0.0, date: null };
     const cells = row.querySelectorAll('td');
     if (cells.length < 4) return { rain: 0.0, date: null };
 
-    const dateCell = cells[0];
-    const dateText = dateCell ? dateCell.innerText.trim() : null;
-    const gaugeText = cells[3].textContent.trim(); // fourth column = Gauge Catch
+    const dateText = cells[0].innerText.trim(); // first column = date
+    const gaugeText = cells[3].innerText.trim(); // fourth column = Gauge Catch
 
     const matchGauge = gaugeText.match(/[\d.]+/);
     const rain = matchGauge ? parseFloat(matchGauge[0]) : 0.0;
@@ -33,20 +33,21 @@ const puppeteer = require('puppeteer');
     return { rain, date: dateText };
   });
 
-  // Parse rainInfo.date into ISO if possible
+  // Try to parse the date from MM/DD/YYYY format
   let isoDate = null;
   if (rainInfo.date) {
-    const parts = rainInfo.date.split('/');
-    if (parts.length === 3) {
-      const month = parts[0].padStart(2, '0');
-      const day = parts[1].padStart(2, '0');
-      const year = parts[2];
+    const parts = rainInfo.date.match(/(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);
+    if (parts) {
+      const month = parts[1].padStart(2, '0');
+      const day = parts[2].padStart(2, '0');
+      const year = parts[3];
       isoDate = `${year}-${month}-${day}`;
     }
   }
 
+  // Write the final rain_today.json
   fs.writeFileSync('rain_today.json', JSON.stringify({
-    date: isoDate || new Date().toISOString().split('T')[0], // fallback to today if parsing fails
+    date: isoDate || new Date().toISOString().split('T')[0], // fallback
     total_precip_in: rainInfo.rain
   }, null, 2));
 
