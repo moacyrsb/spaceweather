@@ -23,7 +23,8 @@ const puppeteer = require('puppeteer');
     const cells = row.querySelectorAll('td');
     if (cells.length < 4) return { rain: 0.0, date: null };
 
-    const dateText = cells[0].textContent.trim(); // first column = date
+    const dateCell = cells[0];
+    const dateText = dateCell ? dateCell.innerText.trim() : null;
     const gaugeText = cells[3].textContent.trim(); // fourth column = Gauge Catch
 
     const matchGauge = gaugeText.match(/[\d.]+/);
