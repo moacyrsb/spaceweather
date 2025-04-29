@@ -33,20 +33,21 @@ const puppeteer = require('puppeteer');
     return { rain, date: dateText };
   });
 
-  // Try to parse the date from MM/DD/YYYY format
-    let isoDate = null;
-    if (rainInfo.date) {
-      const parts = rainInfo.date.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (parts) {
-        const month = parts[1].padStart(2, '0');
-        const day = parts[2].padStart(2, '0');
-        const year = parts[3];
-        isoDate = `${year}-${month}-${day}`;
-      }
+  // Debug: show raw date string
+  console.log("Raw date string from site:", rainInfo.date);
+
+  // Try flexible parsing of date
+  let isoDate = null;
+  if (rainInfo.date) {
+    const parsed = new Date(rainInfo.date);
+    if (!isNaN(parsed)) {
+      isoDate = parsed.toISOString().split('T')[0];
+    } else {
+      console.warn("⚠️ Could not parse date from site. Falling back to today's date.");
     }
+  }
 
-
-  // Write the final rain_today.json
+  // Write final JSON
   fs.writeFileSync('rain_today.json', JSON.stringify({
     date: isoDate || new Date().toISOString().split('T')[0], // fallback
     total_precip_in: rainInfo.rain
@@ -54,4 +55,5 @@ const puppeteer = require('puppeteer');
 
   await browser.close();
 })();
+
 
