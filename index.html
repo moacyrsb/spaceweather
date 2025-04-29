@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Geophysical Acquisitions Conditions</title>
+  <title>Geophysical Acquisition Conditions</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body {
@@ -31,7 +31,7 @@
   </style>
 </head>
 <body>
-  <h1>Geophysical Acquisitions Conditions</h1>
+  <h1>Geophysical Acquisition Conditions</h1>
   <div id="conditions">
     <strong>Current Conditions:</strong><br>
     <div id="cond-precip"></div>
@@ -99,8 +99,8 @@
     const rainTime = rainData.timestamp.toLocaleString(); // format timestamp
 
     let precipStatus = "✅ Good";
-      if (precip < 0.1 && precip > 0.0) precipStatus = "⚠️ Warning - light rain";
-      else if (precip >= 0.1) precipStatus = "⚠️ Warning - heavy rainfall";
+      if (precip < 0.1 && precip > 0.0) precipStatus = "Light rain";
+      else if (precip >= 0.1) precipStatus = "Heavy rainfall - check local weather";
 
     document.getElementById("cond-precip").innerText = `- Accumulated rain/snowfall: ${precip.toFixed(2)}″ (measured at ${rainTime}) – ${precipStatus}`;
 
