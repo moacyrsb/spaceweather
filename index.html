@@ -70,22 +70,23 @@
     }
 
     async function getRainFromHTML() {
-      const url = "rain_today.json";
-      let result = { total: 0.0, timestamp: new Date() };
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data && data.total_precip_in != null) {
-          result.total = parseFloat(data.total_precip_in);
-        }
-        if (data && data.observation_time_rfc822) {
-          result.timestamp = new Date(data.observation_time_rfc822);
-        }
-      } catch (err) {
-        console.warn("Rain fetch failed", err);
+    const url = "rain_today.json";
+    let result = { total: 0.0, timestamp: new Date() };
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.total_precip_in != null) {
+        result.total = parseFloat(data.total_precip_in);
       }
-      return result;
+      if (data && data.date) {
+        result.timestamp = new Date(data.date); // ✅ Use this instead of observation_time_rfc822
+      }
+    } catch (err) {
+      console.warn("Rain fetch failed", err);
     }
+    return result;
+  }
+
 
 
     async function main() {
