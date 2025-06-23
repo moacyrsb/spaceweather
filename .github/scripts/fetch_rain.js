@@ -9,7 +9,7 @@ const puppeteer = require('puppeteer');
 
   const page = await browser.newPage();
 
-  await page.goto('https://dex.cocorahs.org/stations/SD-DV-38/obs-tables', {
+  await page.goto('https://dex.cocorahs.org/stations/SD-MH-92/obs-tables', {
     waitUntil: 'networkidle2',
     timeout: 60000
   });
