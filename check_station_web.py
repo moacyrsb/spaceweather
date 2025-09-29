@@ -112,7 +112,7 @@ ax2.axhline(4, color='gray', linestyle='--')
 ax2.set_xticks(x_pos)
 ax2.set_xticklabels(kp_df['time'].dt.strftime('%H:%M UTC'))  # 👈 label as UTC
 ax2.set_ylabel('Kp Index')
-ax2.set_title('Kp Index (Last 9 Hours, UTC time)')  # 👈 update title
+ax2.set_title('Kp Index (Last 9 Hours, UTC)')  # 👈 update title
 ax2.set_ylim(0, 9)
 ax2.grid(True, axis='y')
 
@@ -126,5 +126,6 @@ st.markdown(f"<h2 style='color:{box_color}'>{go_status}</h2>", unsafe_allow_html
 st.write("Status details:")
 st.write("- ∆F variation OK" if variation_ok else "- ⚠️ ∆F variation exceeded ±2 nT")
 st.write("- Kp index OK" if kp_ok else "- ⚠️ Kp index > 4")
+
 
 
