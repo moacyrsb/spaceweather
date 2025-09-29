@@ -176,53 +176,61 @@
         console.warn("1s F plot failed");
       }
 
-      // Kp index using the correct recent 9-hour format
-      const kp_txt = await fetchText("https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt");
-      const today = new Date();
-      const today_str = today.toISOString().split("T")[0].replace(/-/g, " ");
-      const kp_line = kp_txt.split("\n").find(line => line.startsWith(today_str));
-      let kp_vals = [], kp_labels = [];
-      if (kp_line) {
-        const parts = kp_line.trim().split(/\s+/);
-        const midnight = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-        for (let i = 0; i < 8; i++) {
-          const val = parseFloat(parts[parts.length - 8 + i]);
-          if (!isNaN(val) && val !== -1.00) {
-            kp_vals.push(val);
-            kp_labels.push(new Date(midnight.getTime() + i * 3 * 3600 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-          }
-        }
+<!-- Kp index (UTC block labels) -->
+<script>
+  // ...keep everything above this the same...
+
+  // Kp index using the correct recent 9-hour format (UTC labels)
+  const kp_txt = await fetchText("https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt");
+  const today = new Date();
+  const today_str = today.toISOString().split("T")[0].replace(/-/g, " ");
+  const kp_line = kp_txt.split("\n").find(line => line.startsWith(today_str));
+
+  let kp_vals = [], kp_labels = [];
+  if (kp_line) {
+    const parts = kp_line.trim().split(/\s+/);
+    const midnightUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()); // 00:00 UTC
+    for (let i = 0; i < 8; i++) {
+      const val = parseFloat(parts[parts.length - 8 + i]);
+      if (!isNaN(val) && val !== -1.00) {
+        kp_vals.push(val);
+        const blockUTC = new Date(midnightUTC + i * 3 * 3600 * 1000);
+        // 👉 format label explicitly in UTC, 24h, and append "UTC"
+        const lbl = blockUTC.toLocaleTimeString('en-GB', {
+          hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC'
+        }) + ' UTC';
+        kp_labels.push(lbl);
       }
+    }
+  }
 
-      const recent_kps = kp_vals.slice(-3);
-      const latestKp = recent_kps[recent_kps.length - 1] ?? 9;
-      const kp_ok = latestKp <= KP_THRESHOLD;
+  const recent_kps = kp_vals.slice(-3);
+  const latestKp = recent_kps[recent_kps.length - 1] ?? 9;
+  const kp_ok = latestKp <= KP_THRESHOLD;
+  document.getElementById("cond-kp").innerText = `- Kp index ≤ 4 – ${kp_ok ? "✅ Good" : "⚠️ Warning"}`;
 
-      document.getElementById("cond-kp").innerText = `- Kp index ≤ 4 – ${kp_ok ? "✅ Good" : "⚠️ Warning"}`;
+  const trace_kp = {
+    x: kp_labels.slice(-3), // category labels, already UTC
+    y: recent_kps,
+    type: 'bar',
+    marker: { color: recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson') }
+  };
 
-      const trace_kp = {
-        x: kp_labels.slice(-3),
-        y: recent_kps,
-        type: 'bar',
-        marker: {
-          color: recent_kps.map(k => k <= KP_THRESHOLD ? 'limegreen' : 'crimson')
-        }
-      };
+  const layout_kp = {
+    title: 'Kp Index (Last 9 Hours, UTC)',   // 👈 make UTC explicit
+    yaxis: { title: 'Kp Index', range: [0, 9] },
+    xaxis: { title: 'UTC time' },
+    shapes: [{
+      type: 'line', x0: -0.5, x1: 2.5, y0: KP_THRESHOLD, y1: KP_THRESHOLD,
+      line: { dash: 'dash', color: 'gray' }
+    }]
+  };
 
-      const layout_kp = {
-        title: 'Kp Index (Last 9 Hours)',
-        yaxis: { title: 'Kp Index', range: [0, 9] },
-        shapes: [{
-          type: 'line',
-          x0: -0.5,
-          x1: 2.5,
-          y0: KP_THRESHOLD,
-          y1: KP_THRESHOLD,
-          line: { dash: 'dash', color: 'gray' }
-        }]
-      };
+  Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
 
-      Plotly.newPlot('plot-kp', [trace_kp], layout_kp);
+  // ...keep everything below this the same...
+</script>
+
 
 // --- Final status logic ---
     const status = document.getElementById("go-status");
