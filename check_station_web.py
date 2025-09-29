@@ -75,7 +75,8 @@ if kp_line:
             kp_val = float(kp_str)
             if kp_val != -1.00:
                 block_time = midnight + timedelta(hours=i * 3)
-                kp_times.append(block_time.astimezone(gmt_minus_6))
+                # 👉 keep UTC time
+                kp_times.append(block_time)
                 kp_values.append(kp_val)
         except ValueError:
             continue
@@ -86,6 +87,7 @@ else:
     kp_df = pd.DataFrame({"time": kp_times, "kp": kp_values})
 
 kp_ok = kp_df['kp'].iloc[-1] <= 4
+
 
 # --- Plots ---
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=False)
@@ -101,16 +103,19 @@ ax1.grid(True)
 # Kp plot
 x_pos = range(len(kp_df))
 colors = ['limegreen' if k <= 4 else 'crimson' for k in kp_df['kp']]
-bars = ax2.bar(x_pos, kp_df['kp'], color=colors)
+ax2.bar(x_pos, kp_df['kp'], color=colors)
+
 for x, value in zip(x_pos, kp_df['kp']):
     ax2.text(x, value + 0.2, str(value), ha='center', fontsize=10)
+
 ax2.axhline(4, color='gray', linestyle='--')
 ax2.set_xticks(x_pos)
-ax2.set_xticklabels(kp_df['time'].dt.strftime('%H:%M'))
+ax2.set_xticklabels(kp_df['time'].dt.strftime('%H:%M UTC'))  # 👈 label as UTC
 ax2.set_ylabel('Kp Index')
-ax2.set_title('Kp Index (Last 9 Hours)')
+ax2.set_title('Kp Index (Last 9 Hours, UTC)')  # 👈 update title
 ax2.set_ylim(0, 9)
 ax2.grid(True, axis='y')
+
 
 st.pyplot(fig)
 
@@ -121,3 +126,4 @@ st.markdown(f"<h2 style='color:{box_color}'>{go_status}</h2>", unsafe_allow_html
 st.write("Status details:")
 st.write("- ∆F variation OK" if variation_ok else "- ⚠️ ∆F variation exceeded ±2 nT")
 st.write("- Kp index OK" if kp_ok else "- ⚠️ Kp index > 4")
+
